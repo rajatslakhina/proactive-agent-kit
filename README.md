@@ -2,6 +2,7 @@
 
 **An agent that acts before you ask is only safe if three things are true: it cannot leak what it reads, it cannot act twice, and it cannot do anything consequential without a "yes" bound to that exact action. This package makes all three properties of the type system and the pipeline, not of the prompt.**
 
+[![CI](https://github.com/rajatslakhina/proactive-agent-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/rajatslakhina/proactive-agent-kit/actions/workflows/ci.yml)
 ![Swift 6](https://img.shields.io/badge/Swift-6.0-orange) ![Platforms](https://img.shields.io/badge/platforms-iOS%2017%20%7C%20macOS%2014%20%7C%20Linux%20(core)-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Demo app: (added after the companion repo is pushed — see below)
@@ -42,7 +43,7 @@ Signal ─▶ EventLog ─▶ TriageModel ─▶ EgressPolicy ─▶ CloudPlanne
 | `ActionJournal` | Side-effect de-duplication across retries and relaunches | Keyed by **signal id**, not by the action: each event executes exactly one action, and after a crash a cloud model re-plans with different wording, so an action-keyed journal would miss. Checked right after a claim (before any re-triage, re-plan or fresh approval card) and again before executing. Recorded in the same synchronous stretch as the executor's return; `Codable`, persisted by the host. |
 | `AgentLoop` (actor) | The single agent loop | `step` is serialised: a call that arrives while another is suspended returns `.busy` (flag set before the first `await`). State that another call could change across an `await` is re-validated afterwards (e.g. consent granted while an event was being parked). |
 
-`ProactiveAgentUI` adds `AgentConsoleView` / `AgentConsoleModel`, a SwiftUI console that drives the real loop with fault injection. It compiles to an empty module on Linux. **It has not yet been compiled on an Apple platform** (see *Verification*); a separate test target that imports the core without `@testable` exercises every public symbol the console uses, so access-level regressions fail on Linux.
+`ProactiveAgentUI` adds `AgentConsoleView` / `AgentConsoleModel`, a SwiftUI console that drives the real loop with fault injection. It compiles to an empty module on Linux and is built for macOS and the iOS Simulator in CI. A separate test target that imports the core without `@testable` exercises every public symbol the console uses, so an access-level regression fails on Linux too, not only on Apple platforms.
 
 ## Trade-offs and rejected alternatives
 
@@ -71,8 +72,6 @@ For the interactive console, open the companion demo app (link above) in Xcode.
 ```swift
 .package(url: "https://github.com/rajatslakhina/proactive-agent-kit.git", from: "1.0.0")
 ```
-
-(`v1.0.0` is cut once CI is green; until then, depend on a revision.)
 
 ```swift
 import ProactiveAgent
@@ -104,10 +103,12 @@ try JSONEncoder().encode(await loop.status().journal).write(to: journalURL, opti
 
 - Linux, Swift 6.0.3: `rm -rf .build && swift build -Xswiftc -warnings-as-errors` → 0 warnings; `swift test` → **78 tests, 0 failures** (77 in `ProactiveAgentTests`, 1 in `ProactiveAgentPublicAPITests`).
 - Tests include broken-implementation checks for the properties this README claims. With the scanner removed, a broken classifier **does** leak a one-time code and an email address. With the journal dropped, a side effect **does** repeat after a simulated crash. With a planner whose wording changes on every call, a crash after execution is still suppressed on relaunch, before re-planning. Other checks: a tampered digest or a different summary is rejected; two concurrent approvals execute once; an approval after its TTL does not execute; consent granted while the loop is suspended inside `park` requeues the event; a concurrent `step` is refused; the triage cache stays bounded when the log sheds deferred events. Digest values are checked against known answers from an independent Python implementation.
-- Mutation checks: independent reviewers applied mutants to scratch copies. Four that survived an earlier version of the suite were re-run after the tests were strengthened, and each now fails at least one test: moving the approval removal after the executor `await`, dropping the triage-cache bound, disabling the consent re-check after `park`, and disabling the contact-shape fallback. Making `OutcomeDescription`'s initialiser internal again now fails the public-API test target at compile time.
+- Mutation checks: independent reviewers applied mutants to scratch copies. Five that survived (or hung) an earlier version of the suite were re-run after the tests were strengthened, and each now fails at least one test: moving the approval removal after the executor `await`, dropping the triage-cache bound, disabling the consent re-check after `park`, disabling the contact-shape fallback, and removing the `step` busy guard (which used to hang the test instead of failing it). Making `OutcomeDescription`'s initialiser internal again now fails the public-API test target at compile time.
 - Writing the tests also caught a real trap: `backoff(afterAttempt: Int.min)` overflowed on `attempt - 1`. It is now saturating.
-- **The SwiftUI module (`ProactiveAgentUI`) has never been compiled on an Apple platform.** A reviewer found a real cross-module access bug in it by reading (an internal initialiser used from the UI module), which is fixed and now guarded by the public-API test target; the macOS CI job is the first real compile.
-- CI (`.github/workflows/ci.yml`): a Linux `swift:6.0` job (clean build and tests, warnings as errors) and a `macos-15` job (`swift test` on macOS, then `xcodebuild` builds of both modules for `generic/platform=iOS Simulator`). **Results are recorded here after the first runs finish; none are claimed yet.**
+- CI ([Actions](https://github.com/rajatslakhina/proactive-agent-kit/actions/workflows/ci.yml)), green on the first run:
+  - **Linux** (`swift:6.0` container): clean `swift build -Xswiftc -warnings-as-errors`, 0 warnings; `swift test`, 78 tests, 0 failures.
+  - **macOS** (`macos-15`, Xcode 16.4, Swift 6.1.2): `swift test -Xswiftc -warnings-as-errors` compiles both modules, including `ProactiveAgentUI`, and runs the same 78 tests with 0 failures. Then `xcodebuild build` for `generic/platform=iOS Simulator` succeeds for the `ProactiveAgent` and `ProactiveAgentUI` schemes with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
+- Before CI existed, a reviewer found a real cross-module bug in the SwiftUI module by reading it: an internal initialiser was called from the UI module. It was fixed and is now guarded by the public-API test target. The macOS job above was the module's first real compile.
 - Simulator: see the demo repo for exactly what was and was not run.
 
 ## License
