@@ -5,7 +5,7 @@
 [![CI](https://github.com/rajatslakhina/proactive-agent-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/rajatslakhina/proactive-agent-kit/actions/workflows/ci.yml)
 ![Swift 6](https://img.shields.io/badge/Swift-6.0-orange) ![Platforms](https://img.shields.io/badge/platforms-iOS%2017%20%7C%20macOS%2014%20%7C%20Linux%20(core)-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
-Demo app: (added after the companion repo is pushed — see below)
+Demo app: **[proactive-agent-demo-app](https://github.com/rajatslakhina/proactive-agent-demo-app)**, a SwiftUI console that drives this package's real loop with fault injection. It depends on this repo's `v1.0.0` tag as a remote package and has been run on an iPhone Duo simulator (iOS 27.1).
 
 ---
 
@@ -109,7 +109,7 @@ try JSONEncoder().encode(await loop.status().journal).write(to: journalURL, opti
   - **Linux** (`swift:6.0` container): clean `swift build -Xswiftc -warnings-as-errors`, 0 warnings; `swift test`, 78 tests, 0 failures.
   - **macOS** (`macos-15`, Xcode 16.4, Swift 6.1.2): `swift test -Xswiftc -warnings-as-errors` compiles both modules, including `ProactiveAgentUI`, and runs the same 78 tests with 0 failures. Then `xcodebuild build` for `generic/platform=iOS Simulator` succeeds for the `ProactiveAgent` and `ProactiveAgentUI` schemes with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
 - Before CI existed, a reviewer found a real cross-module bug in the SwiftUI module by reading it: an internal initialiser was called from the UI module. It was fixed and is now guarded by the public-API test target. The macOS job above was the module's first real compile.
-- Simulator: see the demo repo for exactly what was and was not run.
+- Simulator: this package has no app of its own. The [demo app](https://github.com/rajatslakhina/proactive-agent-demo-app) resolved this package's `v1.0.0` tag from GitHub in Xcode and ran on an iPhone Duo simulator (iOS 27.1) on 27 Oct 2026. Its README lists exactly what the run showed. Screenshots were captured during that run but are not yet in either repo.
 
 ## License
 
